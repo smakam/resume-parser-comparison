@@ -142,16 +142,41 @@ class FixedResumeParser:
                 not any(char.isdigit() for char in line) and
                 not any(word.lower() in ['street', 'road', 'avenue', 'drive', 'lane', 'heritage', 'apartment', 'building'] for word in words)):
                 
+                # Additional checks to filter out obviously bad lines
+                max_word_length = max(len(word.rstrip('.,;:!?')) for word in words)
+                has_company_punctuation = any(char in line for char in '()[]{}/')
+                tech_company_terms = ['datacom', 'edtech', 'gaming', 'networking', 'startups', 'systems', 'cratos']
+                has_tech_terms = any(term in line.lower() for term in tech_company_terms)
+                
                 # Prefer lines that are all caps or title case (typical resume formatting)
                 if (line.isupper() or line.istitle() or 
                     all(word[0].isupper() for word in words if word.isalpha())):
-                    potential_names.append(line)
+                    
+                    # Only add if it passes sanity checks
+                    if (max_word_length <= 20 and 
+                        not has_company_punctuation and 
+                        not has_tech_terms):
+                        potential_names.append(line)
         
         # Strategy 1.5: Handle split names and mixed content
-        # First prioritize complete names (2-4 words) in potential_names
+        # First prioritize complete names (2-4 words) in potential_names - but with sanity checks
         for name in potential_names:
             if 2 <= len(name.split()) <= 4:
-                return name
+                words = name.split()
+                # Sanity check: reject names with words that are too long or have punctuation
+                max_word_length = max(len(word.rstrip('.,;:!?')) for word in words)
+                has_punctuation = any(char in name for char in '.,;:!?()[]{}/')
+                has_ampersand = '&' in name
+                
+                # Also check for company/tech related terms that shouldn't be names
+                tech_company_terms = ['datacom', 'edtech', 'gaming', 'networking', 'startups', 'systems']
+                has_tech_terms = any(term in name.lower() for term in tech_company_terms)
+                
+                if (max_word_length <= 20 and 
+                    not has_punctuation and 
+                    not has_ampersand and 
+                    not has_tech_terms):
+                    return name
         
         # Then check for mixed content lines (like "CLEETUS CAREEROBJECTIVE") - only if no clean names found
         for line in mixed_content_lines:
@@ -214,10 +239,19 @@ class FixedResumeParser:
                         has_tech_terms = any(word.lower() in tech_terms for word in words)
                         has_location_terms = any(word.lower() in location_terms for word in words)
                         
+                        # Additional sanity checks for obviously bad extractions
+                        max_word_length = max(len(word) for word in words) if words else 0
+                        has_long_words = max_word_length > 15  # Names don't have super long words
+                        total_length = len(name_text)
+                        has_punctuation = any(char in name_text for char in '.,;:!?')
+                        
                         if (2 <= len(words) <= 4 and 
                             not has_location_terms and
                             not any(char.isdigit() for char in name_text) and
-                            not has_tech_terms):
+                            not has_tech_terms and
+                            not has_long_words and
+                            total_length <= 50 and  # Names shouldn't be super long
+                            not has_punctuation):    # Names don't have punctuation
                             person_entities.append((name_text, ent.start_char))
                 
                 # Return the first valid person entity (usually closest to top)
@@ -234,7 +268,12 @@ class FixedResumeParser:
         if signature_name:
             return signature_name
         
-        # Strategy 4: Fallback to simple first line that looks like a name
+        # Strategy 4: Extract name from email address (last resort)
+        email_name = self._extract_name_from_email(text)
+        if email_name:
+            return email_name
+        
+        # Strategy 5: Fallback to simple first line that looks like a name
         for line in lines[:5]:
             line = line.strip()
             # Add more strict filtering for first line fallback
@@ -344,11 +383,89 @@ class FixedResumeParser:
                 all(word[0].isupper() for word in words if word.isalpha() and len(word) > 1)):
                 
                 # Filter out common false positives
-                if not any(bad_word in line.lower() for bad_word in [
-                    'father', 'mother', 'mr.', 'mrs.', 'name', 'company',
-                    'address', 'city', 'state', 'country'
-                ]):
+                bad_words = ['father', 'mother', 'mr.', 'mrs.', 'name', 'company',
+                           'address', 'city', 'state', 'country']
+                book_tech_terms = ['book', 'cookbook', 'mastering', 'ansible', 'docker', 'automation',
+                                 'programmability', 'coreos', 'edition', 'developers', 'network']
+                
+                has_bad_words = any(bad_word in line.lower() for bad_word in bad_words)
+                has_book_terms = any(book_term in line.lower() for book_term in book_tech_terms)
+                has_quotes = '"' in line
+                
+                if not has_bad_words and not has_book_terms and not has_quotes:
                     return line
+        
+        return None
+    
+    def _extract_name_from_email(self, text):
+        """Extract name from email address as last resort"""
+        import re
+        
+        # Find email addresses
+        email_pattern = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
+        emails = re.findall(email_pattern, text)
+        
+        for email in emails:
+            # Get the part before @
+            username = email.split('@')[0]
+            
+            # Skip if too short or contains numbers (likely not a name)
+            if len(username) < 6 or any(char.isdigit() for char in username):
+                continue
+            
+            # Try different patterns to extract name from email
+            name_candidates = []
+            
+            # Pattern 1: firstname.lastname or firstname_lastname
+            if '.' in username or '_' in username:
+                separator = '.' if '.' in username else '_'
+                parts = username.split(separator)
+                if len(parts) == 2 and all(len(part) >= 2 for part in parts):
+                    name_candidates.append(f"{parts[0].title()} {parts[1].title()}")
+            
+            # Pattern 2: firstnamelastname (concatenated)
+            if len(username) >= 8 and username.isalpha():
+                # Try smart splitting like we do for LinkedIn
+                best_split = None
+                best_score = 0
+                
+                for split_point in range(3, len(username)-2):
+                    first_part = username[:split_point]
+                    second_part = username[split_point:]
+                    
+                    if (first_part.isalpha() and second_part.isalpha() and 
+                        3 <= len(first_part) <= 10 and 3 <= len(second_part) <= 10):
+                        
+                        # Score the split
+                        score = 0
+                        
+                        # Prefer splits where first part ends with vowel
+                        if first_part[-1].lower() in 'aeiou':
+                            score += 1
+                        
+                        # Prefer balanced lengths
+                        if 4 <= len(first_part) <= 8:
+                            score += 1
+                        if 4 <= len(second_part) <= 8:
+                            score += 1
+                        
+                        # Bonus for common name patterns
+                        if first_part.lower().endswith(('a', 'i', 'as', 'us')):
+                            score += 1
+                        if second_part.lower().startswith(('m', 'k', 's', 'r')):
+                            score += 1
+                        
+                        if score > best_score:
+                            best_score = score
+                            best_split = (first_part, second_part)
+                
+                if best_split and best_score >= 2:
+                    name_candidates.append(f"{best_split[0].title()} {best_split[1].title()}")
+            
+            # Return the first valid candidate
+            for candidate in name_candidates:
+                if len(candidate.split()) == 2:
+                    return candidate
         
         return None
     
