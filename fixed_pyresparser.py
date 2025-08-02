@@ -143,7 +143,12 @@ class FixedResumeParser:
                     potential_names.append(line)
         
         # Strategy 1.5: Handle split names and mixed content
-        # First check for mixed content lines (like "CLEETUS CAREEROBJECTIVE")
+        # First prioritize complete names (2-4 words) in potential_names
+        for name in potential_names:
+            if 2 <= len(name.split()) <= 4:
+                return name
+        
+        # Then check for mixed content lines (like "CLEETUS CAREEROBJECTIVE") - only if no clean names found
         for line in mixed_content_lines:
             if any(keyword in line.lower() for keyword in ['objective', 'career', 'summary']):
                 # Extract the name part before the keyword
@@ -159,10 +164,12 @@ class FixedResumeParser:
                             else:
                                 return name_part.upper()
                 
+                # Only process separated keywords if no compound keywords found
                 for keyword in ['objective', 'career', 'summary', 'profile']:
                     if keyword in line.lower():
                         name_part = line.lower().split(keyword)[0].strip()
-                        if name_part and len(name_part.split()) <= 3:
+                        # Only use this if it's clearly part of a name (not just random text)
+                        if name_part and len(name_part.split()) <= 2 and name_part.isupper():
                             # Look for additional name parts in potential_names
                             additional_parts = [n for n in potential_names 
                                               if len(n.split()) == 1 and n.isupper()]
@@ -170,11 +177,6 @@ class FixedResumeParser:
                                 return f"{name_part.upper()} {additional_parts[0]}"
                             else:
                                 return name_part.upper()
-        
-        # Then look for complete names (2-4 words) in potential_names
-        for name in potential_names:
-            if 2 <= len(name.split()) <= 4:
-                return name
         
         # Handle split names (like "CLEETUS" and "JOSEPH" on separate lines)
         single_words = [n for n in potential_names if len(n.split()) == 1 and n.isupper()]
