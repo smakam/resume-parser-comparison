@@ -13,8 +13,21 @@ class FixedResumeParser:
     """Fixed version of ResumeParser using modern spaCy and NLTK"""
     
     def __init__(self, resume_path, skills_file=None):
-        # Load standard spaCy model instead of broken custom model
-        self.nlp = spacy.load('en_core_web_sm')
+        # Load spaCy model with fallback
+        try:
+            self.nlp = spacy.load('en_core_web_sm')
+        except OSError:
+            # Fallback: try to download and load
+            try:
+                import subprocess
+                subprocess.run(["python", "-m", "spacy", "download", "en_core_web_sm"], check=True)
+                self.nlp = spacy.load('en_core_web_sm')
+            except:
+                # Final fallback: use blank model with basic components
+                print("Warning: Using basic spaCy model without pre-trained vectors")
+                self.nlp = spacy.blank('en')
+                self.nlp.add_pipe('sentencizer')
+        
         self.matcher = Matcher(self.nlp.vocab)
         self.resume_path = resume_path
         
@@ -114,26 +127,32 @@ class FixedResumeParser:
                     all(word[0].isupper() for word in words if word.isalpha())):
                     return line
         
-        # Strategy 2: Use spaCy NER but with better filtering
-        doc = self.nlp(text[:2000])  # Process first 2000 chars
-        person_entities = []
-        
-        for ent in doc.ents:
-            if ent.label_ == "PERSON":
-                name_text = ent.text.strip()
-                words = name_text.split()
+        # Strategy 2: Use spaCy NER but with better filtering (if available)
+        try:
+            doc = self.nlp(text[:2000])  # Process first 2000 chars
+            person_entities = []
+            
+            # Only use NER if the model has it
+            if doc.ents:
+                for ent in doc.ents:
+                    if ent.label_ == "PERSON":
+                        name_text = ent.text.strip()
+                        words = name_text.split()
+                        
+                        # Filter out common false positives
+                        if (2 <= len(words) <= 4 and 
+                            not any(word.lower() in ['heritage', 'society', 'apartment', 'building', 'street', 'road'] for word in words) and
+                            not any(char.isdigit() for char in name_text)):
+                            person_entities.append((name_text, ent.start_char))
                 
-                # Filter out common false positives
-                if (2 <= len(words) <= 4 and 
-                    not any(word.lower() in ['heritage', 'society', 'apartment', 'building', 'street', 'road'] for word in words) and
-                    not any(char.isdigit() for char in name_text)):
-                    person_entities.append((name_text, ent.start_char))
-        
-        # Return the first valid person entity (usually closest to top)
-        if person_entities:
-            # Sort by position in text (earlier = better)
-            person_entities.sort(key=lambda x: x[1])
-            return person_entities[0][0]
+                # Return the first valid person entity (usually closest to top)
+                if person_entities:
+                    # Sort by position in text (earlier = better)
+                    person_entities.sort(key=lambda x: x[1])
+                    return person_entities[0][0]
+        except:
+            # Skip NER if there's any issue
+            pass
         
         # Strategy 3: Fallback to simple first line that looks like a name
         for line in lines[:5]:
