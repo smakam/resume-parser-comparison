@@ -108,11 +108,16 @@ class FixedResumeParser:
     
     def _extract_name_with_spacy(self, text):
         """Extract name using spaCy NER with improved logic"""
-        # Strategy 1: Look for name patterns in first few lines
         lines = text.split('\n')
         potential_names = []
         mixed_content_lines = []
         
+        # Strategy 0: Check LinkedIn URL for name (very reliable)
+        linkedin_name = self._extract_name_from_linkedin_url(text)
+        if linkedin_name:
+            return linkedin_name
+        
+        # Strategy 1: Look for name patterns in first few lines
         for line in lines[:8]:  # Check first 8 lines
             line = line.strip()
             # Skip empty lines and obvious non-names
@@ -200,9 +205,19 @@ class FixedResumeParser:
                         words = name_text.split()
                         
                         # Filter out common false positives
+                        tech_terms = ['cloud', 'computing', 'technology', 'virtualization', 'architecture', 
+                                    'management', 'development', 'engineering', 'solution', 'analyst',
+                                    'infrastructure', 'datacenter', 'software', 'hardware']
+                        location_terms = ['heritage', 'society', 'apartment', 'building', 'street', 'road',
+                                        'nagar', 'vidya', 'valley', 'city', 'town', 'village', 'district']
+                        
+                        has_tech_terms = any(word.lower() in tech_terms for word in words)
+                        has_location_terms = any(word.lower() in location_terms for word in words)
+                        
                         if (2 <= len(words) <= 4 and 
-                            not any(word.lower() in ['heritage', 'society', 'apartment', 'building', 'street', 'road'] for word in words) and
-                            not any(char.isdigit() for char in name_text)):
+                            not has_location_terms and
+                            not any(char.isdigit() for char in name_text) and
+                            not has_tech_terms):
                             person_entities.append((name_text, ent.start_char))
                 
                 # Return the first valid person entity (usually closest to top)
@@ -214,13 +229,126 @@ class FixedResumeParser:
             # Skip NER if there's any issue
             pass
         
-        # Strategy 3: Fallback to simple first line that looks like a name
+        # Strategy 3: Check signature area first (more reliable than first line fallback)
+        signature_name = self._extract_name_from_signature(text, lines)
+        if signature_name:
+            return signature_name
+        
+        # Strategy 4: Fallback to simple first line that looks like a name
         for line in lines[:5]:
             line = line.strip()
+            # Add more strict filtering for first line fallback
+            skip_terms = ['summary', 'profile', 'objective', 'professional', 'experience', 'education']
             if (line and 2 <= len(line.split()) <= 4 and 
                 not '@' in line and not any(char.isdigit() for char in line) and
+                not any(term in line.lower() for term in skip_terms) and
                 all(word[0].isupper() for word in line.split() if word.isalpha())):
                 return line
+        
+        return None
+    
+    def _extract_name_from_linkedin_url(self, text):
+        """Extract name from LinkedIn URL"""
+        import re
+        
+        # Find LinkedIn URLs
+        linkedin_pattern = r'https?://(?:www\.)?(?:in\.)?linkedin\.com/in/([a-zA-Z0-9-]+)'
+        matches = re.findall(linkedin_pattern, text)
+        
+        for match in matches:
+            # Convert LinkedIn username to name format
+            username = match.replace('-', ' ')
+            
+            # Handle concatenated names like "bhargavmeka" -> "bhargav meka"
+            if ' ' not in username and username.isalpha() and len(username) > 4:
+                # Try to split concatenated names using common name patterns
+                # Look for capital letters that might indicate name boundaries
+                import re
+                
+                # Try splitting on capital letters in the middle
+                parts = re.findall(r'[A-Z][a-z]*|[a-z]+', username)
+                if len(parts) >= 2:
+                    name_parts = [part.title() for part in parts if part.isalpha() and len(part) > 1]
+                    if 2 <= len(name_parts) <= 4:
+                        return ' '.join(name_parts)
+                
+                # Fallback: try common name length patterns with smart splitting
+                if len(username) >= 8:
+                    # Try different split points, prioritizing those that make phonetic sense
+                    best_split = None
+                    best_score = 0
+                    
+                    for split_point in range(4, len(username)-2):
+                        first_part = username[:split_point]
+                        second_part = username[split_point:]
+                        
+                        if (first_part.isalpha() and second_part.isalpha() and 
+                            3 <= len(first_part) <= 10 and 3 <= len(second_part) <= 8):
+                            
+                            # Score the split based on name-like patterns
+                            score = 0
+                            
+                            # Prefer splits where first part ends with vowel or common endings
+                            if first_part[-1].lower() in 'aeiou':
+                                score += 2
+                            if first_part.lower().endswith(('av', 'an', 'ar', 'al')):
+                                score += 3
+                            
+                            # Prefer splits where second part starts with consonant
+                            if second_part[0].lower() not in 'aeiou':
+                                score += 1
+                            
+                            # Prefer balanced length (neither too short nor too long)
+                            if 5 <= len(first_part) <= 8:
+                                score += 2
+                            if 3 <= len(second_part) <= 6:
+                                score += 1
+                            
+                            if score > best_score:
+                                best_score = score
+                                best_split = (first_part, second_part)
+                    
+                    if best_split:
+                        return f"{best_split[0].title()} {best_split[1].title()}"
+            else:
+                # Handle already split names
+                name_parts = []
+                for part in username.split():
+                    if part.isalpha() and len(part) > 1:
+                        name_parts.append(part.title())
+                
+                if 2 <= len(name_parts) <= 4:
+                    return ' '.join(name_parts)
+        
+        return None
+    
+    def _extract_name_from_signature(self, text, lines):
+        """Extract name from signature area (usually at the end of resume)"""
+        # Check last 20 lines for potential names
+        for line in lines[-20:]:
+            line = line.strip()
+            if not line:
+                continue
+            
+            # Skip obvious non-names
+            if any(skip_word in line.lower() for skip_word in [
+                'date', 'place', 'signature', 'regards', 'sincerely', 
+                'best', 'thanks', 'email', 'phone', 'mobile', '@'
+            ]):
+                continue
+            
+            # Look for lines that could be names (2-4 words, proper case)
+            words = line.split()
+            if (2 <= len(words) <= 4 and 
+                not any(char.isdigit() for char in line) and
+                all(word[0].isupper() for word in words if word.isalpha() and len(word) > 1)):
+                
+                # Filter out common false positives
+                if not any(bad_word in line.lower() for bad_word in [
+                    'father', 'mother', 'mr.', 'mrs.', 'name', 'company',
+                    'address', 'city', 'state', 'country'
+                ]):
+                    return line
         
         return None
     
