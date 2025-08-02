@@ -110,22 +110,80 @@ class FixedResumeParser:
         """Extract name using spaCy NER with improved logic"""
         # Strategy 1: Look for name patterns in first few lines
         lines = text.split('\n')
+        potential_names = []
+        mixed_content_lines = []
+        
         for line in lines[:8]:  # Check first 8 lines
             line = line.strip()
             # Skip empty lines and obvious non-names
             if not line or '@' in line or 'phone' in line.lower() or 'email' in line.lower():
                 continue
+            
+            # Check for lines with mixed content (name + keywords)
+            if any(keyword in line.lower() for keyword in ['objective', 'career', 'summary', 'profile']):
+                mixed_content_lines.append(line)
+                continue
+                
+            # Skip other common resume section headers
+            if any(header in line.lower() for header in [
+                'experience', 'education', 'skills', 'project management', 
+                'contact', 'about', 'summary'
+            ]):
+                continue
                 
             # Check if line looks like a name (all caps, title case, or proper formatting)
             words = line.split()
-            if (2 <= len(words) <= 4 and 
+            if (1 <= len(words) <= 4 and 
                 not any(char.isdigit() for char in line) and
                 not any(word.lower() in ['street', 'road', 'avenue', 'drive', 'lane', 'heritage', 'apartment', 'building'] for word in words)):
                 
                 # Prefer lines that are all caps or title case (typical resume formatting)
                 if (line.isupper() or line.istitle() or 
                     all(word[0].isupper() for word in words if word.isalpha())):
-                    return line
+                    potential_names.append(line)
+        
+        # Strategy 1.5: Handle split names and mixed content
+        # First check for mixed content lines (like "CLEETUS CAREEROBJECTIVE")
+        for line in mixed_content_lines:
+            if any(keyword in line.lower() for keyword in ['objective', 'career', 'summary']):
+                # Extract the name part before the keyword
+                for keyword_combo in ['careerobjective', 'careergoal', 'careersummary']:
+                    if keyword_combo in line.lower():
+                        name_part = line.lower().split(keyword_combo)[0].strip()
+                        if name_part and len(name_part.split()) <= 3:
+                            # Look for additional name parts in potential_names
+                            additional_parts = [n for n in potential_names 
+                                              if len(n.split()) == 1 and n.isupper()]
+                            if additional_parts:
+                                return f"{name_part.upper()} {additional_parts[0]}"
+                            else:
+                                return name_part.upper()
+                
+                for keyword in ['objective', 'career', 'summary', 'profile']:
+                    if keyword in line.lower():
+                        name_part = line.lower().split(keyword)[0].strip()
+                        if name_part and len(name_part.split()) <= 3:
+                            # Look for additional name parts in potential_names
+                            additional_parts = [n for n in potential_names 
+                                              if len(n.split()) == 1 and n.isupper()]
+                            if additional_parts:
+                                return f"{name_part.upper()} {additional_parts[0]}"
+                            else:
+                                return name_part.upper()
+        
+        # Then look for complete names (2-4 words) in potential_names
+        for name in potential_names:
+            if 2 <= len(name.split()) <= 4:
+                return name
+        
+        # Handle split names (like "CLEETUS" and "JOSEPH" on separate lines)
+        single_words = [n for n in potential_names if len(n.split()) == 1 and n.isupper()]
+        if len(single_words) >= 2:
+            return f"{single_words[0]} {single_words[1]}"
+                
+        # Return the first potential name if we found any
+        if potential_names:
+            return potential_names[0]
         
         # Strategy 2: Use spaCy NER but with better filtering (if available)
         try:
