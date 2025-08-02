@@ -1,0 +1,188 @@
+{% extends "base.html" %}
+
+{% block title %}About - Resume Parser Comparison{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-10">
+        <h1 class="text-center mb-4">
+            <i class="fas fa-info-circle me-2"></i>About Resume Parser Comparison
+        </h1>
+
+        <div class="card mb-4">
+            <div class="card-header">
+                <h4 class="mb-0">What is this tool?</h4>
+            </div>
+            <div class="card-body">
+                <p>
+                    This web application demonstrates the difference between two approaches to resume parsing:
+                    traditional rule-based methods using regular expressions versus modern AI-powered 
+                    natural language processing techniques.
+                </p>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-md-6">
+                <div class="card h-100">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-search me-2"></i>Regex Parser
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <h6>How it works:</h6>
+                        <ul>
+                            <li>Uses predefined patterns to find information</li>
+                            <li>Searches for email patterns, phone formats</li>
+                            <li>Looks for section headers like "Skills", "Education"</li>
+                            <li>Extracts text following these patterns</li>
+                        </ul>
+                        
+                        <h6>Advantages:</h6>
+                        <ul class="text-success">
+                            <li>Fast processing</li>
+                            <li>Predictable results</li>
+                            <li>Low resource usage</li>
+                            <li>Easy to debug</li>
+                        </ul>
+                        
+                        <h6>Limitations:</h6>
+                        <ul class="text-danger">
+                            <li>Rigid pattern matching</li>
+                            <li>Struggles with variations</li>
+                            <li>No context understanding</li>
+                            <li>Requires manual pattern updates</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-6">
+                <div class="card h-100">
+                    <div class="card-header bg-success text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-brain me-2"></i>spaCy + NLTK Parser
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <h6>How it works:</h6>
+                        <ul>
+                            <li>Uses trained language models</li>
+                            <li>Named Entity Recognition (NER)</li>
+                            <li>Context-aware pattern matching</li>
+                            <li>Semantic understanding of text</li>
+                        </ul>
+                        
+                        <h6>Advantages:</h6>
+                        <ul class="text-success">
+                            <li>Context-aware extraction</li>
+                            <li>Handles variations well</li>
+                            <li>Better accuracy</li>
+                            <li>Semantic understanding</li>
+                        </ul>
+                        
+                        <h6>Limitations:</h6>
+                        <ul class="text-danger">
+                            <li>Higher resource usage</li>
+                            <li>More complex setup</li>
+                            <li>Slower processing</li>
+                            <li>Model dependencies</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card mt-4">
+            <div class="card-header">
+                <h4 class="mb-0">
+                    <i class="fas fa-cogs me-2"></i>Technical Details
+                </h4>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6>Regex Parser Uses:</h6>
+                        <ul>
+                            <li><code>pdfplumber</code> - PDF text extraction</li>
+                            <li><code>docx2txt</code> - Word document processing</li>
+                            <li><code>re</code> - Regular expression patterns</li>
+                            <li>Custom keyword-based section detection</li>
+                        </ul>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>spaCy + NLTK Parser Uses:</h6>
+                        <ul>
+                            <li><code>spaCy</code> - Industrial NLP library</li>
+                            <li><code>en_core_web_sm</code> - English language model</li>
+                            <li><code>NLTK</code> - Natural language toolkit</li>
+                            <li>Named Entity Recognition (NER)</li>
+                            <li>Pattern matching with linguistic features</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card mt-4">
+            <div class="card-header">
+                <h4 class="mb-0">
+                    <i class="fas fa-file-alt me-2"></i>Supported Formats
+                </h4>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-4">
+                        <div class="text-center">
+                            <i class="fas fa-file-pdf fa-3x text-danger mb-2"></i>
+                            <h6>PDF Files</h6>
+                            <p class="text-muted">Portable Document Format</p>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="text-center">
+                            <i class="fas fa-file-word fa-3x text-primary mb-2"></i>
+                            <h6>DOCX Files</h6>
+                            <p class="text-muted">Microsoft Word (newer format)</p>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="text-center">
+                            <i class="fas fa-file-word fa-3x text-info mb-2"></i>
+                            <h6>DOC Files</h6>
+                            <p class="text-muted">Microsoft Word (legacy format)</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="alert alert-info mt-3">
+                    <i class="fas fa-info-circle me-2"></i>
+                    Maximum file size: 16MB per upload
+                </div>
+            </div>
+        </div>
+
+        <div class="card mt-4">
+            <div class="card-header">
+                <h4 class="mb-0">
+                    <i class="fas fa-shield-alt me-2"></i>Privacy & Security
+                </h4>
+            </div>
+            <div class="card-body">
+                <ul>
+                    <li>Uploaded files are processed in memory and immediately deleted</li>
+                    <li>No data is permanently stored on our servers</li>
+                    <li>All processing happens server-side for security</li>
+                    <li>Results are only shown to you and not saved</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="text-center mt-4">
+            <a href="{{ url_for('index') }}" class="btn btn-primary btn-lg">
+                <i class="fas fa-upload me-2"></i>Try the Parser
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}

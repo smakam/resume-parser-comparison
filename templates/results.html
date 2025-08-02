@@ -1,0 +1,211 @@
+{% extends "base.html" %}
+
+{% block title %}Results - Resume Parser Comparison{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1>
+                <i class="fas fa-chart-bar me-2"></i>Parsing Results
+            </h1>
+            <a href="{{ url_for('index') }}" class="btn btn-primary">
+                <i class="fas fa-upload me-2"></i>Upload Another Resume
+            </a>
+        </div>
+
+        <div class="alert alert-info">
+            <i class="fas fa-file me-2"></i>
+            <strong>File:</strong> {{ results.filename }}
+            <span class="badge bg-secondary ms-2">{{ "%.1f"|format(results.file_size / 1024) }} KB</span>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Regex Parser Results -->
+    <div class="col-md-6">
+        <div class="comparison-card">
+            <div class="parser-header regex-header">
+                <h4 class="mb-0">
+                    <i class="fas fa-search me-2"></i>Regex Parser
+                    {% if results.parsers.regex.success %}
+                        <span class="badge bg-success ms-2">Success</span>
+                    {% else %}
+                        <span class="badge bg-danger ms-2">Error</span>
+                    {% endif %}
+                </h4>
+                <small class="text-muted">Pattern-based extraction using regular expressions</small>
+            </div>
+            <div class="result-content">
+                {% if results.parsers.regex.success %}
+                    {% for field, value in results.parsers.regex.data.items() %}
+                        <div class="mb-3">
+                            <div class="field-name">{{ field.replace('_', ' ') }}:</div>
+                            <div class="mt-1">
+                                {% if value == "Not found" %}
+                                    <span class="not-found">{{ value }}</span>
+                                {% elif value is string %}
+                                    <span>{{ value }}</span>
+                                {% elif value is mapping %}
+                                    <div class="ms-3">
+                                        {% for k, v in value.items() %}
+                                            <div><strong>{{ k }}:</strong> 
+                                                {% if v is sequence and v is not string %}
+                                                    <ul class="mb-0">
+                                                        {% for item in v %}
+                                                            <li>{{ item }}</li>
+                                                        {% endfor %}
+                                                    </ul>
+                                                {% else %}
+                                                    {{ v }}
+                                                {% endif %}
+                                            </div>
+                                        {% endfor %}
+                                    </div>
+                                {% elif value is sequence and value is not string %}
+                                    <ul class="mb-0">
+                                        {% for item in value %}
+                                            <li>{{ item }}</li>
+                                        {% endfor %}
+                                    </ul>
+                                {% else %}
+                                    <span>{{ value }}</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="alert alert-danger">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        <strong>Error:</strong> {{ results.parsers.regex.error }}
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- spaCy Parser Results -->
+    <div class="col-md-6">
+        <div class="comparison-card">
+            <div class="parser-header spacy-header">
+                <h4 class="mb-0">
+                    <i class="fas fa-brain me-2"></i>spaCy + NLTK Parser
+                    {% if results.parsers.spacy.success %}
+                        <span class="badge bg-success ms-2">Success</span>
+                    {% else %}
+                        <span class="badge bg-danger ms-2">Error</span>
+                    {% endif %}
+                </h4>
+                <small class="text-muted">AI-powered extraction using natural language processing</small>
+            </div>
+            <div class="result-content">
+                {% if results.parsers.spacy.success %}
+                    {% for field, value in results.parsers.spacy.data.items() %}
+                        <div class="mb-3">
+                            <div class="field-name">{{ field.replace('_', ' ') }}:</div>
+                            <div class="mt-1">
+                                {% if value == "Not found" %}
+                                    <span class="not-found">{{ value }}</span>
+                                {% elif value is string %}
+                                    <span>{{ value }}</span>
+                                {% elif value is mapping %}
+                                    <div class="ms-3">
+                                        {% for k, v in value.items() %}
+                                            <div><strong>{{ k }}:</strong> 
+                                                {% if v is sequence and v is not string %}
+                                                    <ul class="mb-0">
+                                                        {% for item in v %}
+                                                            <li>{{ item }}</li>
+                                                        {% endfor %}
+                                                    </ul>
+                                                {% else %}
+                                                    {{ v }}
+                                                {% endif %}
+                                            </div>
+                                        {% endfor %}
+                                    </div>
+                                {% elif value is sequence and value is not string %}
+                                    <ul class="mb-0">
+                                        {% for item in value %}
+                                            <li>{{ item }}</li>
+                                        {% endfor %}
+                                    </ul>
+                                {% else %}
+                                    <span>{{ value }}</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="alert alert-danger">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        <strong>Error:</strong> {{ results.parsers.spacy.error }}
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Comparison Summary -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-balance-scale me-2"></i>Comparison Summary
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6>Regex Parser Strengths:</h6>
+                        <ul>
+                            <li>Fast processing</li>
+                            <li>Predictable patterns</li>
+                            <li>Good for structured data</li>
+                            <li>Lower resource usage</li>
+                        </ul>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>spaCy + NLTK Parser Strengths:</h6>
+                        <ul>
+                            <li>Context-aware extraction</li>
+                            <li>Better handling of variations</li>
+                            <li>Named entity recognition</li>
+                            <li>More robust parsing</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- API Information -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-code me-2"></i>API Access
+                </h5>
+            </div>
+            <div class="card-body">
+                <p>You can also access this functionality programmatically:</p>
+                <div class="bg-light p-3 rounded">
+                    <code>
+                        POST {{ request.url_root }}api/upload<br>
+                        Content-Type: multipart/form-data<br>
+                        Body: file=[your resume file]
+                    </code>
+                </div>
+                <p class="mt-2 mb-0">
+                    <small class="text-muted">Returns JSON with results from both parsers</small>
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
